@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_DB: atlas
+      POSTGRES_USER: atlas_user
+      POSTGRES_PASSWORD: atlas_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U atlas_user -d atlas" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build: .
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      APP_URL: http://localhost:4000
+      DATABASE_URL: postgresql://atlas_user:atlas_password@postgres:5432/atlas
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-min-32-characters-long
+      REFRESH_TOKEN_SECRET: dev-refresh-secret-min-32-chars
+      ENCRYPTION_KEY: dev-encryption-key-min-32-chars
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - uploads:/app/uploads
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:
